@@ -25,7 +25,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util.percentage import ranged_value_to_percentage
 
 from .const import PRESET_MODES, PRESET_TO_MODE, SPEED_COUNT
-from .entity import XcreasEntity
+from .entity import XcreasEntity, make_device_reconciler
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,10 +37,17 @@ MODE_TO_PRESET = {v: k for k, v in PRESET_TO_MODE.items()}
 
 async def async_setup_entry(hass, entry, async_add_entities) -> None:
     coordinator = entry.runtime_data
-    entities: list[XcreasFan] = []
-    for device_id in list(coordinator.data.devices):
-        entities.append(XcreasFan(coordinator, device_id))
-    async_add_entities(entities, update_before_add=False)
+    owned: dict[str, XcreasFan] = {}
+    reconcile = make_device_reconciler(
+        coordinator,
+        entry,
+        hass,
+        async_add_entities,
+        owned,
+        lambda device_id: [XcreasFan(coordinator, device_id)],
+    )
+    reconcile()
+    entry.async_on_unload(coordinator.async_add_device_listener(reconcile))
 
 
 class XcreasFan(XcreasEntity, FanEntity):

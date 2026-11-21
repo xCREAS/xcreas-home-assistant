@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "authority": "xcreas-api docs/ha-integration.md §4/§5 (2026-11-21)",
+    "authority": "xcreas-api docs/ha-integration.md §4/§5 (2026-11-21 account-sync)",
     "note": "Shared contract samples: the HA integration tests assert THIS file; the API-side apitest asserts the same shapes. Update both together."
   },
   "snapshot": {
@@ -20,10 +20,26 @@
           "freshness": "fresh"
         },
         "control": {
-          "power": {"value": 1, "received_at": "2026-11-20T16:14:45.490Z", "freshness": "fresh"},
-          "mode": {"value": "manual", "received_at": "2026-11-20T16:14:45.490Z", "freshness": "fresh"},
-          "fan_level": {"value": 0, "received_at": "2026-11-20T16:14:45.490Z", "freshness": "fresh"},
-          "motor_speed_indicator": {"value": 2, "received_at": "2026-11-20T16:14:45.490Z", "freshness": "fresh"},
+          "power": {
+            "value": 1,
+            "received_at": "2026-11-20T16:14:45.490Z",
+            "freshness": "fresh"
+          },
+          "mode": {
+            "value": "manual",
+            "received_at": "2026-11-20T16:14:45.490Z",
+            "freshness": "fresh"
+          },
+          "fan_level": {
+            "value": 0,
+            "received_at": "2026-11-20T16:14:45.490Z",
+            "freshness": "fresh"
+          },
+          "motor_speed_indicator": {
+            "value": 2,
+            "received_at": "2026-11-20T16:14:45.490Z",
+            "freshness": "fresh"
+          },
           "motor_speed_setpoint": {
             "value": 520,
             "percent": 50,
@@ -33,12 +49,25 @@
           }
         },
         "sensors": {
-          "pm25": {"value": 12, "received_at": "2026-11-20T16:14:45.490Z", "freshness": "fresh"},
-          "temperature": {"value": 23, "received_at": "2026-11-20T16:14:45.490Z", "freshness": "fresh"},
-          "humidity": {"value": 47.5, "received_at": "2026-11-20T16:14:45.490Z", "freshness": "fresh"}
+          "pm25": {
+            "value": 12,
+            "received_at": "2026-11-20T16:14:45.490Z",
+            "freshness": "fresh"
+          },
+          "temperature": {
+            "value": 23,
+            "received_at": "2026-11-20T16:14:45.490Z",
+            "freshness": "fresh"
+          },
+          "humidity": {
+            "value": 47.5,
+            "received_at": "2026-11-20T16:14:45.490Z",
+            "freshness": "fresh"
+          }
         }
       }
-    ]
+    ],
+    "inventory_complete": true
   },
   "snapshot_offline_missing": {
     "account_id": "6c78eecb-3cb7-4b71-b099-c5908b161253",
@@ -55,15 +84,24 @@
           "received_at": "2026-11-20T15:00:00.000Z",
           "freshness": "stale"
         },
-        "control": {"power": {"value": 0, "received_at": "2026-11-20T15:00:00.000Z", "freshness": "stale"}},
+        "control": {
+          "power": {
+            "value": 0,
+            "received_at": "2026-11-20T15:00:00.000Z",
+            "freshness": "stale"
+          }
+        },
         "sensors": {}
       }
-    ]
+    ],
+    "inventory_complete": true
   },
   "command_request": {
     "device_id": "V350s-001",
     "action": "set_fan_speed",
-    "params": {"percentage": 50},
+    "params": {
+      "percentage": 50
+    },
     "request_id": "ha-20261120-000123"
   },
   "command_response_applied": {
@@ -80,12 +118,39 @@
     "error": "device_rejected",
     "detail": "downlink_not_ready"
   },
-  "command_error_offline": {"code": 409, "message": "device_offline"},
-  "command_error_conflict": {"code": 409, "message": "request_id_conflict"},
-  "command_error_capability": {"code": 422, "message": "capability_not_supported"},
+  "command_error_offline": {
+    "code": 409,
+    "message": "device_offline"
+  },
+  "command_error_conflict": {
+    "code": 409,
+    "message": "request_id_conflict"
+  },
+  "command_error_capability": {
+    "code": 422,
+    "message": "capability_not_supported"
+  },
   "ws_frames": {
-    "subscribed": {"type": "subscribed", "account_id": "6c78eecb-3cb7-4b71-b099-c5908b161253", "devices": 1},
-    "changed": {"type": "changed"},
-    "revoked": {"type": "revoked"}
+    "subscribed": {
+      "type": "subscribed",
+      "account_id": "6c78eecb-3cb7-4b71-b099-c5908b161253",
+      "devices": 1
+    },
+    "changed": {
+      "type": "changed"
+    },
+    "revoked": {
+      "type": "revoked"
+    }
+  },
+  "snapshot_empty": {
+    "account_id": "6c78eecb-3cb7-4b71-b099-c5908b161253",
+    "generated_at": "2026-11-21T16:14:45.490Z",
+    "inventory_complete": true,
+    "devices": []
+  },
+  "command_error_snapshot_too_large": {
+    "code": 503,
+    "message": "snapshot_too_large"
   }
 }

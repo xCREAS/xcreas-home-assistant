@@ -3,8 +3,13 @@
 Merge-pull: the push connection schedules refreshes on "changed" notices
 (client-side debounce on top of the server throttle) and the low-frequency
 fallback poll (FALLBACK_POLL_SECONDS) recovers silently lost notifications.
-Entity cleanup runs ONLY on a fully successful snapshot (spec §3: 只有完整
-成功的发现结果可以清理已移出范围的实体).
+
+The snapshot is the AUTHORITATIVE device inventory (§4): a refresh succeeds
+only on a strictly valid body (account_id, inventory_complete:true, unique
+stable device ids, account match). Any failure keeps the previous device
+list — entities/cleanup NEVER run on a failed or partial read. Device-set
+changes are announced to the platforms (dynamic add/remove of the entities)
+via listeners registered with async_add_device_listener.
 """
 
 from __future__ import annotations
@@ -13,13 +18,13 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Any
+from typing import Any, Callable
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import XcreasApiClient, XcreasAuthError, parse_snapshot
+from .api import XcreasApiClient, XcreasAuthError, XcreasSnapshotInvalid, parse_snapshot
 from .const import AVAILABILITY_ONLINE, FALLBACK_POLL_SECONDS
 
 _LOGGER = logging.getLogger(__name__)
@@ -94,7 +99,10 @@ class XcreasCoordinator(DataUpdateCoordinator[XcreasSnapshot]):
         # Push plumbing (wired by async_setup_entry).
         self._ws = None
         self._push_refresh_task: asyncio.Task | None = None
+        self._push_refresh_queued = False
         self._full_success_seen = False
+        # Device-set listeners (the platforms' dynamic add/remove hooks).
+        self._device_listeners: list[Callable[[XcreasSnapshot], None]] = []
 
     # --- snapshot refresh ---
 
@@ -108,11 +116,50 @@ class XcreasCoordinator(DataUpdateCoordinator[XcreasSnapshot]):
             raise ConfigEntryAuthFailed(f"xcreas auth failed: {err.code}") from err
         if not isinstance(body, dict) or not body.get("account_id"):
             raise UpdateFailed("snapshot missing account_id")
+        if body.get("account_id") != self.account_id:
+            # 账号不匹配 = 错误账号数据 — the snapshot is invalid for THIS
+            # entry (V03: 错误账号数据不触发删除); keep the previous list.
+            raise UpdateFailed(
+                f"snapshot account {body.get('account_id')!r} does not match entry account {self.account_id!r}"
+            )
+        try:
+            blocks = parse_snapshot(body)
+        except XcreasSnapshotInvalid as err:
+            # Strict completeness contract (§4): field missing, wrong type,
+            # duplicate ids or a missing inventory_complete marker invalidate
+            # the whole inventory — keep the last known-good list.
+            raise UpdateFailed(f"snapshot failed strict validation: {err.args[0]}") from err
         snapshot = XcreasSnapshot(account_id=body["account_id"])
-        for raw in parse_snapshot(body):
+        for raw in blocks:
             snapshot.devices[raw["device_id"]] = XcreasDeviceData(raw["device_id"], raw)
         self._full_success_seen = True
+        self._notify_device_listeners(snapshot)
         return snapshot
+
+    # --- device-set listeners (dynamic entity add/remove) ---
+
+    @callback
+    def async_add_device_listener(
+        self, listener: Callable[[XcreasSnapshot], None]
+    ) -> Callable[[], None]:
+        """Register a device-set listener; it fires on every successful
+        inventory update (including the first refresh). Returns the unhook."""
+        self._device_listeners.append(listener)
+
+        @callback
+        def _unhook() -> None:
+            if listener in self._device_listeners:
+                self._device_listeners.remove(listener)
+
+        return _unhook
+
+    @callback
+    def _notify_device_listeners(self, snapshot: XcreasSnapshot) -> None:
+        for listener in list(self._device_listeners):
+            try:
+                listener(snapshot)
+            except Exception:  # noqa: BLE001 — one broken platform never kills the refresh
+                _LOGGER.exception("xcreas device listener failed")
 
     # --- push hooks (called from the websocket task) ---
 
@@ -134,7 +181,10 @@ class XcreasCoordinator(DataUpdateCoordinator[XcreasSnapshot]):
 
     def _schedule_push_refresh(self) -> None:
         """One in-flight push refresh at a time; a burst of notices (server
-        throttle trailing edge) coalesces into a single snapshot pull.
+        throttle trailing edge) coalesces. A notice arriving DURING an
+        in-flight refresh sets the queued flag — the trailing pull below
+        re-reads, so the LAST change can never be swallowed (§3.2: 拉取期间
+        收到新通知时合并为一次后续刷新，不能丢掉最后一次变更).
 
         NOTE: the refresh task method must NOT be named `_debounced_refresh` —
         DataUpdateCoordinator sets an instance attribute with that exact name
@@ -143,7 +193,9 @@ class XcreasCoordinator(DataUpdateCoordinator[XcreasSnapshot]):
         that bypass __init__).
         """
         if self._push_refresh_task is not None and not self._push_refresh_task.done():
+            self._push_refresh_queued = True
             return
+        self._push_refresh_queued = False
         # ConfigEntry.async_create_background_task (NOT hass.config_entries —
         # that object has no such method, found live; NOT a bare asyncio task —
         # this one is canceled automatically when the entry unloads). Verified
@@ -154,7 +206,12 @@ class XcreasCoordinator(DataUpdateCoordinator[XcreasSnapshot]):
 
     async def _push_refresh_once(self) -> None:
         await asyncio.sleep(0)  # yield once so trailing notices can pile in
-        await self._async_refresh(log_failures=False)
+        while True:
+            self._push_refresh_queued = False
+            await self._async_refresh(log_failures=False)
+            if not self._push_refresh_queued:
+                return
+            await asyncio.sleep(0)  # yield before the trailing pull
 
     @callback
     def async_connection_revoked(self) -> None:

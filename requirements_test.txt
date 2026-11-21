@@ -1,11 +1,12 @@
 # The HA test harness pins an exact HA release. The integration is verified
 # against MULTIPLE HA versions by running the suite in per-version venvs:
-#   HA 2025.4.4  → harness 0.13.236 (python 3.13) — 37/37 passed
-#   HA 2025.12.0 → harness 0.13.298 (python 3.13) — 37/37 passed
-#   HA 2026.10.4 → harness 0.13.375 (python 3.14) — 37/37 passed (primary)
+#   HA 2025.4.4  → harness 0.13.236 (python 3.13)
+#   HA 2025.12.0 → harness 0.13.298 (python 3.13)
+#   HA 2026.10.4 → harness 0.13.375 (python 3.14, primary)
 # 2025.1 and below CANNOT work: LocalOAuth2ImplementationWithPkce landed in
 # HA Core 2025.4.0 (verified against the 2025.1.0b2 harness — collection
-# error), which is why manifest.json declares homeassistant >= 2025.4.0.
+# error). The distribution floor is declared in hacs.json ("homeassistant":
+# "2025.4.0", HACS-level); manifest.json carries NO min-version key.
 # (aiohttp/aiodns/pycares note: the 2025.12 harness pins aiodns==3.5.0 —
 # install the harness FIRST, then downgrade to aiodns==3.2.0 +
 # pycares==4.4.0; a same-command pin fails resolution, and the resolver's

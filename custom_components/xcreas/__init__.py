@@ -1,13 +1,17 @@
-"""The xCREAS Home Assistant integration (beta, manual install).
+"""The xCREAS Home Assistant integration (account-level device sync).
 
-One config entry = one xCREAS account (one OAuth grant). Setup builds the
-API client + coordinator, starts the /ws/ha push connection and forwards the
-fan, select and sensor platforms for the account's authorized devices. Unload releases
-the connection and its task (docs/ha-integration.md §7/§8).
+One config entry = one xCREAS account (one OAuth grant, scope
+`homeassistant:account`). Setup builds the API client + coordinator, starts
+the /ws/ha push connection and forwards the fan, select and sensor platforms;
+the DEVICE SET is maintained automatically from the authoritative snapshot —
+bound/shared devices appear, unbound/withdrawn/frozen devices are removed,
+with no re-authorization (docs/ha-integration.md §3/§7). Unload releases the
+connection and its task.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from homeassistant.config_entries import ConfigEntry
@@ -72,7 +76,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+    # Startup sweep (stale-devices rule): the full snapshot is authoritative
+    # — remove THIS entry's device-registry rows for devices no longer in the
+    # inventory (the entity reconcile removes their entities; the delayed
+    # sweep clears the registry rows this integration left behind).
+    entry.async_create_background_task(
+        hass, _cleanup_stale_registry(hass, entry, coordinator), name="xcreas-startup-cleanup"
+    )
     return True
+
+
+async def _cleanup_stale_registry(hass: HomeAssistant, entry: ConfigEntry, coordinator: XcreasCoordinator) -> None:
+    """Delayed device-registry sweep against the startup inventory."""
+    from homeassistant.helpers import device_registry as dr
+
+    await asyncio.sleep(10)  # let the platform reconciles finish removing entities
+    registry = dr.async_get(hass)
+    valid = set(coordinator.data.devices) if coordinator.data else set()
+    for registry_entry in list(registry.devices.values()):
+        for domain, value in registry_entry.identifiers:
+            if domain != DOMAIN or value in valid:
+                continue
+            if entry.entry_id not in registry_entry.config_entries:
+                continue
+            registry.async_remove_device(registry_entry.id)
+            _LOGGER.info("xcreas: removed stale device registry entry %s", value)
+            break
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

@@ -1,22 +1,30 @@
 # xCREAS for Home Assistant
 
 [![HACS Action](https://github.com/xCREAS/xcreas-home-assistant/actions/workflows/validate.yml/badge.svg)](https://github.com/xCREAS/xcreas-home-assistant/actions)
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.1.0-blue)
 
 Official xCREAS integration for Home Assistant. Connect your xCREAS air
-purifier (V350s) through the xCREAS cloud: each authorized purifier appears
-as a **fan** with power, stepless 1–100% speed control and operating presets,
-alongside **PM2.5**, **temperature** and **humidity** sensors. Device changes
-are pushed into Home Assistant over a dedicated cloud channel — no inbound
-ports on your home network and nothing to poll manually.
+purifier (V350s) through the xCREAS cloud: each purifier appears as a **fan**
+with power, stepless 1–100% speed control and operating presets, alongside
+**PM2.5**, **temperature** and **humidity** sensors. Device changes are
+pushed into Home Assistant over a dedicated cloud channel — no inbound ports
+on your home network and nothing to poll manually.
 
-Authorization uses the OAuth2 authorization-code flow with **PKCE (S256)**
-against the xCREAS public client. The integration ships **no client secret**:
-you authorize per installation, choose exactly which devices Home Assistant
-may see, and can revoke any connection from the xCREAS app at any time.
+Authorization is **account-level** with the OAuth2 authorization-code flow +
+**PKCE (S256)** against the xCREAS public client: you confirm ONCE, and Home
+Assistant follows your account from then on. Devices you bind or accept to
+share appear automatically; devices you unbind, lose the share for, or that
+leave the supported fleet are removed automatically — no re-authorization,
+no manual re-discovery, no restart. A device that is merely offline stays
+in place and renders as `unavailable`. You can revoke any connection from
+the xCREAS app at any time.
 
 ## Features
 
+- **Account sync**: one confirmation covers every supported device your
+  account can access **now and in the future** — including accepted shares.
+  Bind a purifier in the xCREAS app and it appears in Home Assistant without
+  any action here; unbind it and it disappears on its own.
 - **Fan entity** with power, stepless speed (1–100% mapped onto the device's
   RPM table) and the operating presets `auto`, `sleep`, `eco`.
 - **Manual gear selector** for the purifier's three fixed speeds. Open the
@@ -27,25 +35,33 @@ may see, and can revoke any connection from the xCREAS app at any time.
 - **Environment sensors**: PM2.5 (µg/m³), temperature (°C) and humidity (%).
 - **Cloud push**: device state, telemetry, presence and connection changes
   arrive as coalesced notices; Home Assistant pulls a fresh snapshot per
-  notice (merge-pull) with a low-frequency calibration poll as a safety net.
+  notice (merge-pull) with a low-frequency calibration poll as a safety net
+  — the sync also works when the push connection is temporarily down and
+  recovers by itself.
+- **Zero devices is fine**: you can connect an account that has no eligible
+  devices yet; everything you bind later shows up automatically.
 - **Honest state**: entities never guess. Values converge from device
   reports only — commands are not optimistic, missing fields render as
   `unknown`, and a purifier that is offline renders as `unavailable`.
 - **Per-installation authorization**: each Home Assistant instance gets its
-  own grant with its own device selection; revoke any connection from the
-  xCREAS app (Integrations → Home Assistant) and its access ends immediately.
+  own grant for the account; revoke any connection from the xCREAS app
+  (Integrations → Home Assistant) and its access ends immediately —
+  including live connections and tokens.
 - **Secure by construction**: public OAuth client + PKCE, no reusable secret
   in the integration package, tokens stored in Home Assistant's own storage.
 
 ## Requirements
 
-- Home Assistant **2025.4 or later**. The floor is enforced in
-  `manifest.json`: HA Core 2025.4.0 introduced the PKCE-capable OAuth2
-  helper this integration uses, so older versions cannot load it. The full
-  test suite is verified against HA 2025.4.4, 2025.12.0 and 2026.10.4.
-- An xCREAS account with at least one **online, bound, confirmed** V350s.
+- Home Assistant **2025.4 or later**. The floor is enforced by `hacs.json`
+  for HACS installs (HA Core 2025.4.0 introduced the PKCE-capable OAuth2
+  helper this integration uses); manual installs must check the version
+  themselves. The full test suite is verified against HA 2025.4.4,
+  2025.12.0 and 2026.10.4.
+- An xCREAS account. **No device is required to connect** — zero-device
+  accounts complete the setup and sync devices as they appear. Devices must
+  be online-bound and confirmed in the xCREAS app to become eligible.
 - A device shared **with you** must have an **accepted** share in the
-  xCREAS app before it can be selected.
+  xCREAS app before it can appear here.
 - For the HACS route: HACS 1.30 or later.
 
 ## Installation
@@ -81,11 +97,10 @@ Clone this repository and copy `custom_components/xcreas/` into
 1. **Settings → Devices & Services → Add Integration → xCREAS**.
 2. A browser window opens the xCREAS authorization page. Sign in with your
    xCREAS account.
-3. **Tick exactly the devices** this Home Assistant instance may see and
-   control, then approve. At least one device must be selected; nothing is
-   authorized if you cancel.
-4. Home Assistant receives the authorization and creates one device card per
-   purifier with its fan and sensors.
+3. **Confirm the authorization once** and return to Home Assistant. The
+   page shows your account and what the grant covers — there are no device
+   checkboxes. Works with zero devices: whatever your account can access
+   now (or comes to access later) syncs automatically.
 
 One Home Assistant config entry = one xCREAS account. See
 [Multiple accounts](#multiple-accounts) for how the same purifier behaves
@@ -109,10 +124,14 @@ Behavior guarantees:
 - **`unavailable` vs `unknown`.** A purifier that is offline, or a cloud
   connection that is down, renders its entities `unavailable`. A field the
   device has not reported (yet) renders `unknown` — never zero, never a
-  fabricated default.
+  fabricated default. An offline purifier is NEVER removed from Home
+  Assistant — only losing access (unbind / share withdrawn / frozen) removes it.
 - **Freshness.** Values carry their cloud receive time; the cloud classifies
   staleness against a 5-minute window. Stale values remain real device data
   and are never replaced by guesses.
+- **Stable identities.** Entities are keyed by the cloud's device id.
+  Renames, restarts, re-authentication and account switches (where the
+  source account changes) keep the same entity IDs and history.
 
 ## Automations
 
@@ -147,7 +166,8 @@ The threshold above is a repeatable test rule, not a health recommendation.
 ## Uninstalling
 
 1. Home Assistant: Settings → Devices & Services → xCREAS → **Delete**.
-   This stops the Home Assistant side and releases its connection.
+   This stops the Home Assistant side, releases its connection and removes
+   the entities this integration created.
 2. xCREAS app: Integrations → Home Assistant → delete the connection. This
    revokes the grant; any tokens Home Assistant holds stop working
    immediately.
@@ -157,30 +177,41 @@ The threshold above is a repeatable test rule, not a health recommendation.
 If the authorization becomes invalid (revoked in the app, password reset),
 the integration detects it — via the push channel, the periodic token
 re-validation, or a failed refresh — and starts the **re-authenticate** flow
-automatically. Sign in again and re-select the devices; no uninstall needed.
+automatically. Sign in again with the SAME xCREAS account and confirm once;
+the original connection and your entities are preserved. Signing in with a
+different account is refused (`account_mismatch`) — remove the connection
+first if you truly want to hand it to another account.
 
 ## Multiple accounts
 
-- Each config entry is one xCREAS account; adding the same account twice
-  aborts (`already_configured`).
-- A purifier can be controlled by **only one** xCREAS connection per Home
-  Assistant instance. A second authorization that includes an already-linked
-  device aborts with `device_already_linked`. Revoke the holding connection
-  in the app first, then connect from the other account.
-- Devices newly bound or newly shared to you require a re-authorization —
-  the selection is always an explicit decision, never a silent expansion.
+- Each config entry is one xCREAS account; adding the same account again
+  refreshes the existing entry (`already_configured`), it never duplicates.
+- A purifier shared into two accounts appears **once** per Home Assistant
+  instance: the integration registers one set of entities per device and
+  keeps the entity identity even when the controlling account switches.
+  If the current source account loses access, the other account's entry
+  takes the device over automatically.
+- Devices appear and disappear following your account's live access —
+  a new binding or an accepted share shows up by itself, a withdrawal or
+  unbind removes itself. There is no per-device selection to update.
 
 ## Security and privacy
 
 - The integration package carries **no client secret**: it is a public
-  OAuth2 client using the authorization-code flow with PKCE (S256).
-- Only the devices you explicitly selected are ever visible to Home
-  Assistant; unselected devices send nothing.
+  OAuth2 client using the authorization-code flow with PKCE (S256), with
+  the explicit account scope `homeassistant:account`.
+- The grant covers the devices your account can access through the xCREAS
+  cloud, re-checked against live permissions on every read — a device you
+  lose access to stops being visible and controllable immediately, even
+  before Home Assistant refreshes.
 - Tokens live in Home Assistant's own storage and are refreshed
   automatically; revoking the connection in the xCREAS app invalidates them
   server-side.
 - The connection is outbound from your Home Assistant to the xCREAS cloud —
-  no port forwarding, no inbound firewall rules.
+  no port forwarding, no inbound firewall rules. The default OAuth callback
+  rides the My Home Assistant redirect service (`my.home-assistant.io`);
+  deployments that connect to instances directly must register the instance
+  callback URI on the xCREAS cloud side.
 
 ## Troubleshooting
 
@@ -196,7 +227,8 @@ logger:
 |---|---|
 | Entities `unavailable` | The purifier is offline, or the cloud connection is down. Check the device and your connection; it recovers on its own. |
 | A sensor shows `unknown` | The device has not reported that field yet. It fills in on the next device report — never fabricated. |
-| "Re-authenticate" needed | The authorization was revoked or expired. Complete the flow; your entities are preserved. |
+| "Re-authenticate" needed | The authorization was revoked or expired. Complete the flow with the SAME account; your entities are preserved. |
+| Device list stale (bound device missing / removed device still there) | The inventory refreshes on push notices, on reconnect and at least every 5 minutes. If it lags: open the integration's diagnostics log for snapshot errors, verify the device's binding/share state in the xCREAS app, then reload the integration entry (Settings → Devices & Services → xCREAS → ⋮ → Reload). |
 | Commands "work but state is slow" | State converges from device reports pushed to Home Assistant. If it takes minutes, check the logs for push-connection warnings. |
 | `ws handshake rejected: HTTP 4xx/5xx` in logs | The push connection was refused — include these lines when opening an issue. |
 

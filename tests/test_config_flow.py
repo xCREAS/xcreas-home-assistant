@@ -1,59 +1,45 @@
-"""Config-flow unit checks: the account/device gates (docs/ha-integration.md
-§2/§3). The full OAuth2 browser dance is covered by the HA harness flow
-helpers where practical; these tests pin the create-entry decisions."""
+"""Config-flow unit checks for the account-level gates (docs/ha-integration.md
+§2/§4). The full OAuth2 browser dance is covered by the HA harness flow
+helpers where practical; these tests pin the flow's constants and the strict
+snapshot validation it depends on."""
 
 from __future__ import annotations
 
 import pytest
 
-
-def test_linked_devices_overlap_logic(contract) -> None:
-    """§3: 同一台设备在本 HA 实例内只属于一个条目 — the overlap set is
-    computed against OTHER entries' stored linked_device_ids."""
-    from custom_components.xcreas.config_flow import _linked_devices
-    from custom_components.xcreas.const import CONF_ACCOUNT_ID, CONF_LINKED_DEVICE_IDS, DOMAIN
-
-    class Entry:
-        domain = DOMAIN
-
-        def __init__(self, data):
-            self.data = data
-
-    class Entries:
-        def __init__(self, entries):
-            self._entries = entries
-
-        def async_entries(self):
-            return self._entries
-
-    class Hass:
-        config_entries = Entries(
-            [
-                Entry(
-                    {
-                        CONF_ACCOUNT_ID: "account-a",
-                        CONF_LINKED_DEVICE_IDS: ["V350s-001"],
-                    }
-                ),
-                Entry(
-                    {
-                        CONF_ACCOUNT_ID: "account-b",
-                        CONF_LINKED_DEVICE_IDS: ["V350s-002"],
-                    }
-                ),
-            ]
-        )
-
-    devices = {d["device_id"] for d in contract["snapshot"]["devices"]}
-    # account-a re-authorizing: its own devices are excluded from the check.
-    assert _linked_devices(Hass(), exclude_account="account-a") == {"V350s-002"}
-    # a NEW account (account-c): every already-linked device overlaps.
-    assert _linked_devices(Hass(), exclude_account="account-c") == {"V350s-001", "V350s-002"}
-    _ = devices, DOMAIN
+from custom_components.xcreas.api import XcreasSnapshotInvalid, parse_snapshot
 
 
 def test_scope_constant_matches_contract(contract) -> None:
-    """The HA client requests exactly the documented scope."""
+    """§2: the HA client requests exactly the documented ACCOUNT scope."""
     from custom_components.xcreas.const import SCOPES
 
-    assert SCOPES == ["homeassistant"]
+    assert SCOPES == ["homeassistant:account"]
+
+
+def test_parse_snapshot_accepts_zero_devices(contract) -> None:
+    """§4: a COMPLETE empty inventory is valid — zero-device accounts may
+    connect; the runtime maintains the device set afterwards."""
+    assert parse_snapshot(contract["snapshot_empty"]) == []
+
+
+@pytest.mark.parametrize(
+    ("mutate", "reason"),
+    [
+        (lambda b: b.pop("inventory_complete"), "missing_inventory_complete"),
+        (lambda b: b.__setitem__("inventory_complete", False), "missing_inventory_complete"),
+        (lambda b: b.__setitem__("devices", {"V350s-001": {}}), "bad_devices"),
+        (lambda b: b["devices"].append({"device_id": "V350s-001", "name": "dup"}), "duplicate_device_id"),
+        (lambda b: b["devices"].append({"device_id": ""}), "bad_device_block"),
+        (lambda b: b["devices"].append("V350s-009"), "bad_device_block"),
+        (lambda b: b.pop("account_id"), "missing_account_id"),
+    ],
+)
+def test_parse_snapshot_strict_validation(contract, mutate, reason) -> None:
+    """§4: field missing / wrong type / duplicate device ids invalidate the
+    WHOLE inventory — parse never silently drops devices."""
+    body = contract["snapshot"]
+    mutate(body)
+    with pytest.raises(XcreasSnapshotInvalid) as err:
+        parse_snapshot(body)
+    assert err.value.args[0] == reason

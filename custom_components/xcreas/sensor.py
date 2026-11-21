@@ -28,23 +28,25 @@ from homeassistant.const import (
 )
 from homeassistant.core import callback
 
-from .entity import XcreasEntity
+from .entity import XcreasEntity, make_device_reconciler
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass, entry, async_add_entities) -> None:
     coordinator = entry.runtime_data
-    entities: list[XcreasSensor] = []
-    for device_id in list(coordinator.data.devices):
-        entities.extend(
-            [
-                XcreasPM25Sensor(coordinator, device_id),
-                XcreasTemperatureSensor(coordinator, device_id),
-                XcreasHumiditySensor(coordinator, device_id),
-            ]
-        )
-    async_add_entities(entities, update_before_add=False)
+
+    def build(device_id: str) -> list[XcreasSensor]:
+        return [
+            XcreasPM25Sensor(coordinator, device_id),
+            XcreasTemperatureSensor(coordinator, device_id),
+            XcreasHumiditySensor(coordinator, device_id),
+        ]
+
+    owned: dict[str, XcreasSensor] = {}
+    reconcile = make_device_reconciler(coordinator, entry, hass, async_add_entities, owned, build)
+    reconcile()
+    entry.async_on_unload(coordinator.async_add_device_listener(reconcile))
 
 
 class XcreasSensor(XcreasEntity, SensorEntity):

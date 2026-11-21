@@ -31,6 +31,8 @@ CODE_REQUEST_ID_CONFLICT = "request_id_conflict"
 CODE_CAPABILITY = "capability_not_supported"
 CODE_INVALID_PARAMS = "invalid_params"
 CODE_INVALID_ACTION = "invalid_action"
+CODE_SNAPSHOT_TOO_LARGE = "snapshot_too_large"
+CODE_ACCESS_UNAVAILABLE = "device_access_unavailable"
 
 
 class XcreasApiError(Exception):
@@ -49,6 +51,14 @@ class XcreasAuthError(XcreasApiError):
 
 class XcreasConnectionError(XcreasApiError):
     """Transport-level failure (timeout/network) — retryable."""
+
+
+class XcreasSnapshotInvalid(Exception):
+    """A 200 snapshot body that fails the strict completeness contract
+    (docs/ha-integration.md §4): the response is NOT an authoritative
+    inventory, so the receiver must keep its previous device list. `reason`
+    is one of: missing_account_id, bad_account_id, missing_inventory_complete,
+    bad_devices, bad_device_block, duplicate_device_id."""
 
 
 class XcreasApiClient:
@@ -142,9 +152,35 @@ class XcreasApiClient:
 
 
 def parse_snapshot(body: dict[str, Any]) -> list[dict[str, Any]]:
-    """Extract the device blocks from a snapshot body (identity only — the
-    entities read values from the same structure)."""
+    """Extract and STRICTLY validate the device blocks of a snapshot body
+    (docs/ha-integration.md §4: 账号 ID、完整性标记、devices 数组及其中的
+    稳定设备 ID 严格校验；任何失败都使本次清单失效).
+
+    Raises XcreasSnapshotInvalid (never silently drops devices — an
+    incomplete or malformed inventory must not trigger entity cleanup).
+    """
+    if not isinstance(body, dict):
+        raise XcreasSnapshotInvalid("missing_account_id")
+    account_id = body.get("account_id")
+    if not isinstance(account_id, str) or not account_id:
+        raise XcreasSnapshotInvalid("missing_account_id")
+    # inventory_complete:true is THE completeness marker (§4): it must appear
+    # and be true — a response without it is not an authoritative inventory.
+    if body.get("inventory_complete") is not True:
+        raise XcreasSnapshotInvalid("missing_inventory_complete")
     devices = body.get("devices")
     if not isinstance(devices, list):
-        return []
-    return [d for d in devices if isinstance(d, dict) and d.get("device_id")]
+        raise XcreasSnapshotInvalid("bad_devices")
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for d in devices:
+        if not isinstance(d, dict):
+            raise XcreasSnapshotInvalid("bad_device_block")
+        device_id = d.get("device_id")
+        if not isinstance(device_id, str) or not device_id:
+            raise XcreasSnapshotInvalid("bad_device_block")
+        if device_id in seen:
+            raise XcreasSnapshotInvalid("duplicate_device_id")
+        seen.add(device_id)
+        out.append(d)
+    return out

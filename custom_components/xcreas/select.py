@@ -3,7 +3,7 @@
 from homeassistant.components.select import SelectEntity
 from homeassistant.exceptions import HomeAssistantError
 
-from .entity import XcreasEntity
+from .entity import XcreasEntity, make_device_reconciler
 
 GEAR_LEVELS = {"gear_1": 1, "gear_2": 2, "gear_3": 3}
 LEVEL_OPTIONS = {level: option for option, level in GEAR_LEVELS.items()}
@@ -11,11 +11,18 @@ LEVEL_OPTIONS = {level: option for option, level in GEAR_LEVELS.items()}
 
 async def async_setup_entry(hass, entry, async_add_entities) -> None:
     coordinator = entry.runtime_data
-    async_add_entities(
-        XcreasManualGear(coordinator, device_id)
-        for device_id, device in coordinator.data.devices.items()
-        if device.supports_fan_level
+    owned: dict[str, XcreasManualGear] = {}
+    reconcile = make_device_reconciler(
+        coordinator,
+        entry,
+        hass,
+        async_add_entities,
+        owned,
+        lambda device_id: [XcreasManualGear(coordinator, device_id)],
+        device_eligible=lambda device: device.supports_fan_level,
     )
+    reconcile()
+    entry.async_on_unload(coordinator.async_add_device_listener(reconcile))
 
 
 class XcreasManualGear(XcreasEntity, SelectEntity):

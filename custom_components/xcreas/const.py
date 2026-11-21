@@ -16,7 +16,6 @@ DEFAULT_BASE_URL = "https://api.xcreas.com"
 
 CONF_BASE_URL = "base_url"
 CONF_ACCOUNT_ID = "account_id"
-CONF_LINKED_DEVICE_IDS = "linked_device_ids"
 
 # The HA public client id — NOT a secret (public client + PKCE S256; see
 # docs/ha-integration.md §2). The matching client registration lives in the
@@ -26,7 +25,11 @@ OAUTH2_CLIENT_ID = "xcreas-ha"
 AUTHORIZE_URL = f"{DEFAULT_BASE_URL}/oauth/ha/authorize"
 TOKEN_URL = f"{DEFAULT_BASE_URL}/oauth/ha/token"
 
-SCOPES = ["homeassistant"]
+# The ACCOUNT-level authorization scope (2026-11-21 account-sync contract
+# §2): one consent covers every device the account can currently access plus
+# any device it becomes entitled to later. The cloud rejects the legacy
+# per-device scope "homeassistant".
+SCOPES = ["homeassistant:account"]
 
 SNAPSHOT_PATH = "/api/integrations/ha/snapshot"
 COMMAND_PATH = "/api/integrations/ha/command"

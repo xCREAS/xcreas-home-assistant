@@ -2,36 +2,42 @@
   "config": {
     "step": {
       "pick_implementation": {
-        "title": "Pick your xCREAS authorization",
-        "description": "Sign in to xCREAS in the browser window and choose the devices Home Assistant may control."
+        "title": "Connect xCREAS",
+        "description": "Sign in to xCREAS in the browser window and confirm the authorization once. Home Assistant then follows your account automatically: devices you bind or accept to share appear on their own, and devices you unbind or stop sharing are removed — no re-authorization."
       },
       "auth": {
         "title": "Connect to xCREAS",
-        "description": "The xCREAS authorization was not completed. Open the link again and select your devices."
+        "description": "The xCREAS authorization was not completed. Open the link again and confirm the authorization."
+      },
+      "reauth_confirm": {
+        "title": "Reconnect to xCREAS",
+        "description": "The xCREAS authorization for your account needs to be renewed. Sign in with the SAME xCREAS account in the browser window and confirm the authorization again."
       }
     },
     "error": {
       "invalid_token": "The xCREAS authorization expired. Start again.",
-      "insufficient_scope": "The authorization is missing the required scope. Start again.",
-      "device_not_authorized": "A selected device is no longer accessible from your account. Check the device in the xCREAS app.",
-      "device_not_found": "A selected device no longer exists.",
-      "device_offline": "A selected device is currently offline.",
+      "insufficient_scope": "The authorization is missing the required scope. Update the integration and start again.",
+      "device_not_authorized": "A device is no longer accessible from your account. Check the device in the xCREAS app.",
+      "device_not_found": "A device no longer exists.",
+      "device_offline": "A device is currently offline.",
       "device_unavailable": "The device state could not be read from the xCREAS cloud.",
-      "device_not_active": "A selected device is not active.",
+      "device_not_active": "A device is not active.",
       "state_unavailable": "The device state could not be read.",
       "device_access_unavailable": "The device access check failed on the xCREAS cloud.",
+      "snapshot_too_large": "The account device list exceeds the cloud processing budget. Retry later or contact xCREAS support.",
+      "snapshot_invalid": "The xCREAS cloud returned an incomplete device list. Try again.",
       "service_unavailable": "The xCREAS service is temporarily unavailable. Try again.",
       "transport_error": "Could not reach the xCREAS cloud. Check your connection and try again.",
       "unknown": "Unexpected error. Please check the logs and try again."
     },
     "abort": {
-      "already_configured": "This xCREAS account is already set up.",
+      "already_configured": "This xCREAS account is already set up — the existing connection was refreshed.",
       "oauth_error": "The xCREAS authorization was cancelled or failed.",
       "missing_configuration": "The integration is missing its OAuth configuration.",
       "oauth_unauthorized": "The xCREAS authorization was refused.",
       "oauth_failed": "The xCREAS authorization failed.",
-      "no_devices_authorized": "No devices were authorized for this connection. Reconnect and select at least one device on the xCREAS page.",
-      "device_already_linked": "One of the selected devices is already controlled by another xCREAS connection in this Home Assistant. Revoke that connection first (xCREAS app → Integrations → Home Assistant).",
+      "reauth_successful": "The xCREAS connection was renewed.",
+      "account_mismatch": "The account you signed in with does not match this connection. Reconnect with the original xCREAS account, or remove this connection first and add the other account as a new connection.",
       "account_unresolved": "The xCREAS cloud did not identify the account."
     }
   },

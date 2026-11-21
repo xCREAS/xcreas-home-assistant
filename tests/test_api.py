@@ -63,6 +63,18 @@ async def test_command_machine_error_mapping(contract) -> None:
         assert err.value.status == status
 
 
+async def test_snapshot_retryable_errors_are_not_auth(contract) -> None:
+    """§4: the inventory budget / access-read failures are retryable 503s —
+    NOT auth errors (the entry must keep its previous device list, never
+    start a re-auth)."""
+    for fixture in ("command_error_snapshot_too_large",):
+        client = make_client({("GET", SNAPSHOT_PATH): _HttpError(503, contract[fixture])})
+        with pytest.raises(XcreasApiError) as err:
+            await client.async_get_snapshot()
+        assert not isinstance(err.value, XcreasAuthError)
+        assert err.value.code == "snapshot_too_large"
+
+
 async def test_auth_error_is_typed(contract) -> None:
     client = make_client(
         {("GET", SNAPSHOT_PATH): _HttpError(401, {"code": 401, "message": "invalid_token"})}
