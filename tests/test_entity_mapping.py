@@ -161,6 +161,32 @@ def test_fan_command_actions(contract) -> None:
     _ = COMMAND_PATH, make_client
 
 
+def test_manual_gear_state_follows_reported_manual_subtype(contract) -> None:
+    from custom_components.xcreas.fan import XcreasFan
+    from custom_components.xcreas.select import XcreasManualGear
+
+    coordinator = _coordinator(contract)
+    gear = XcreasManualGear(coordinator, "V350s-001")
+    fan = XcreasFan(coordinator, "V350s-001")
+    control = gear.device_data.raw["control"]
+    control["fan_level"] = {"value": 2}
+    assert gear.current_option is None  # stepless, even if fan_level is set
+    assert fan.percentage == 50
+
+    control["motor_speed_indicator"] = {"value": 0}
+    assert gear.current_option == "gear_2"
+    assert fan.percentage is None  # ignore the old stepless setpoint
+
+    control["mode"] = {"value": "eco"}
+    assert gear.current_option is None
+    control["mode"] = {"value": "manual"}
+    control["power"] = {"value": 0}
+    assert gear.current_option is None
+    control["power"] = {"value": 1}
+    del control["motor_speed_indicator"]
+    assert gear.current_option is None
+
+
 # --- sensor semantics (§6) ---
 
 

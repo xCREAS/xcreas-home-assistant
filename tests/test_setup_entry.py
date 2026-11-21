@@ -5,6 +5,7 @@ T02 unload semantics)."""
 from __future__ import annotations
 
 import time
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from homeassistant.const import Platform
@@ -67,15 +68,18 @@ def _entity_ids(hass: HomeAssistant, platform: Platform) -> list[str]:
     ]
 
 
-async def test_setup_creates_fan_and_sensors(
+async def test_setup_creates_fan_gear_selector_and_sensors(
     hass: HomeAssistant, setup_entry: MockConfigEntry
 ) -> None:
-    """§6: one fan + three sensors for the authorized device."""
+    """One fan, one gear selector and three sensors on the authorized device."""
     await hass.async_block_till_done()
     fans = _entity_ids(hass, Platform.FAN)
     sensors = _entity_ids(hass, Platform.SENSOR)
+    selectors = _entity_ids(hass, Platform.SELECT)
     assert len(fans) == 1
     assert len(sensors) == 3
+    assert len(selectors) == 1
+    assert hass.states.get(selectors[0]).attributes["options"] == ["gear_1", "gear_2", "gear_3"]
     # unique_id = <account>:<device>:<kind> (docs/ha-integration.md §6).
     from homeassistant.helpers import entity_registry as er
 
@@ -85,7 +89,18 @@ async def test_setup_creates_fan_and_sensors(
         for e in registry.entities.values()
         if e.config_entry_id is not None
     )
-    assert kinds == ["fan", "humidity", "pm25", "temperature"]
+    assert kinds == ["fan", "humidity", "manual_gear", "pm25", "temperature"]
+    assert registry.async_get(selectors[0]).device_id == registry.async_get(fans[0]).device_id
+
+    client = setup_entry.runtime_data.client
+    with patch.object(client, "async_send_command", new_callable=AsyncMock) as send:
+        await hass.services.async_call(
+            "select",
+            "select_option",
+            {"entity_id": selectors[0], "option": "gear_2"},
+            blocking=True,
+        )
+        send.assert_awaited_once_with("V350s-001", "set_fan_level", {"fan_level": 2})
 
 
 async def test_push_refresh_uses_real_api(

@@ -2,7 +2,7 @@
 
 One config entry = one xCREAS account (one OAuth grant). Setup builds the
 API client + coordinator, starts the /ws/ha push connection and forwards the
-fan/sensor platforms for the account's authorized devices. Unload releases
+fan, select and sensor platforms for the account's authorized devices. Unload releases
 the connection and its task (docs/ha-integration.md §7/§8).
 """
 
@@ -22,7 +22,7 @@ from .websocket import XcreasWebsocket
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [Platform.FAN, Platform.SENSOR]
+PLATFORMS = [Platform.FAN, Platform.SELECT, Platform.SENSOR]
 
 # Config-entry-only integration: the YAML config slot must stay empty
 # (hassfest requires a schema from integrations defining async_setup).

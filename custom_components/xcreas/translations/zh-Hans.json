@@ -36,6 +36,16 @@
     }
   },
   "entity": {
+    "select": {
+      "manual_gear": {
+        "name": "手动档位",
+        "state": {
+          "gear_1": "1 档",
+          "gear_2": "2 档",
+          "gear_3": "3 档"
+        }
+      }
+    },
     "sensor": {
       "pm25": {
         "name": "PM2.5"

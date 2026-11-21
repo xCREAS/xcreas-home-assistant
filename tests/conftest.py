@@ -8,6 +8,7 @@ fixtures/contract_samples.json and mirror docs/ha-integration.md §4/§5.
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -35,7 +36,7 @@ with FIXTURES.open() as _f:
 @pytest.fixture
 def contract() -> dict[str, Any]:
     """The shared contract samples (docs/ha-integration.md §4/§5)."""
-    return CONTRACT
+    return deepcopy(CONTRACT)
 
 
 class FakeTokenSession:

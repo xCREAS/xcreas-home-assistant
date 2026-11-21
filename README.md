@@ -19,6 +19,11 @@ may see, and can revoke any connection from the xCREAS app at any time.
 
 - **Fan entity** with power, stepless speed (1–100% mapped onto the device's
   RPM table) and the operating presets `auto`, `sleep`, `eco`.
+- **Manual gear selector** for the purifier's three fixed speeds. Open the
+  xCREAS device page and choose Gear 1, 2, or 3 under **Manual gear**. The
+  selection follows the device report. The cloud API must advertise gear
+  control when the integration loads. Reload the entry after a cloud upgrade
+  if the selector is missing.
 - **Environment sensors**: PM2.5 (µg/m³), temperature (°C) and humidity (%).
 - **Cloud push**: device state, telemetry, presence and connection changes
   arrive as coalesced notices; Home Assistant pulls a fresh snapshot per
@@ -91,6 +96,7 @@ across accounts.
 | Entity | Values | Notes |
 |---|---|---|
 | `fan.<device>` | on/off, percentage, preset | Power follows the **reported** power only — an ECO-standby motor stop never fakes "off". 0% turns the purifier off. The displayed percentage shows the device-reported setpoint **when the projection is exact**; otherwise it is hidden rather than guessed. Presets clear when the device reports manual speed. |
+| `select.<device>_manual_gear` | `gear_1`, `gear_2`, `gear_3` | Fixed manual gear. For automations, call `select.select_option` with one of these option keys. |
 | `sensor.<device> pm2.5` | µg/m³ | Device class `pm25`, measurement. |
 | `sensor.<device> temperature` | °C | Device class `temperature`, measurement. |
 | `sensor.<device> humidity` | % | Converted exactly once on the cloud side; Home Assistant never rescales. |

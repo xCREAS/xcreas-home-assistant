@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .api import XcreasApiError
 from .const import DOMAIN, MANUFACTURER
 
 if TYPE_CHECKING:
@@ -50,3 +52,9 @@ class XcreasEntity(CoordinatorEntity["XcreasCoordinator"]):
         if not self.coordinator.last_update_success:
             return False
         return data.online
+
+    async def _command(self, action: str, params: dict | None = None) -> None:
+        try:
+            await self.coordinator.client.async_send_command(self._device_id, action, params)
+        except XcreasApiError as err:
+            raise HomeAssistantError(f"xcreas command failed: {err.code}") from err

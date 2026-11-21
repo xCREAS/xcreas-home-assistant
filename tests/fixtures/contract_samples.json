@@ -12,6 +12,7 @@
         "name": "客厅净化器",
         "model": "V350s",
         "role": "owner",
+        "supports_fan_level": true,
         "availability": "online",
         "presence": {
           "value": "2026-11-20T16:14:45.490Z",
@@ -22,6 +23,7 @@
           "power": {"value": 1, "received_at": "2026-11-20T16:14:45.490Z", "freshness": "fresh"},
           "mode": {"value": "manual", "received_at": "2026-11-20T16:14:45.490Z", "freshness": "fresh"},
           "fan_level": {"value": 0, "received_at": "2026-11-20T16:14:45.490Z", "freshness": "fresh"},
+          "motor_speed_indicator": {"value": 2, "received_at": "2026-11-20T16:14:45.490Z", "freshness": "fresh"},
           "motor_speed_setpoint": {
             "value": 520,
             "percent": 50,

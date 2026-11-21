@@ -36,6 +36,16 @@
     }
   },
   "entity": {
+    "select": {
+      "manual_gear": {
+        "name": "Manual gear",
+        "state": {
+          "gear_1": "Gear 1",
+          "gear_2": "Gear 2",
+          "gear_3": "Gear 3"
+        }
+      }
+    },
     "sensor": {
       "pm25": {
         "name": "PM2.5"

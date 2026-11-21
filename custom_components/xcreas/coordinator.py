@@ -52,6 +52,10 @@ class XcreasDeviceData:
         return self.availability == AVAILABILITY_ONLINE
 
     @property
+    def supports_fan_level(self) -> bool:
+        return self.raw.get("supports_fan_level") is True
+
+    @property
     def control(self) -> dict[str, Any]:
         v = self.raw.get("control")
         return v if isinstance(v, dict) else {}

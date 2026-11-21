@@ -24,7 +24,6 @@ from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util.percentage import ranged_value_to_percentage
 
-from .api import XcreasApiError
 from .const import PRESET_MODES, PRESET_TO_MODE, SPEED_COUNT
 from .entity import XcreasEntity
 
@@ -74,7 +73,10 @@ class XcreasFan(XcreasEntity, FanEntity):
     @property
     def percentage(self) -> int | None:
         """The reported setpoint's percent projection, EXACT only."""
-        setpoint = self.device_data.control.get("motor_speed_setpoint") if self.device_data else None
+        control = self.device_data.control if self.device_data else {}
+        if _int(control.get("motor_speed_indicator")) == 0:
+            return None
+        setpoint = control.get("motor_speed_setpoint")
         if not setpoint:
             return None
         approx = setpoint.get("percent_approximate")
@@ -131,12 +133,6 @@ class XcreasFan(XcreasEntity, FanEntity):
         if preset_mode not in PRESET_MODES:
             raise HomeAssistantError(f"unknown preset {preset_mode}")
         await self._command("set_preset_mode", {"preset": preset_mode})
-
-    async def _command(self, action: str, params: dict | None = None) -> None:
-        try:
-            await self.coordinator.client.async_send_command(self._device_id, action, params)
-        except XcreasApiError as err:
-            raise HomeAssistantError(f"xcreas command failed: {err.code}") from err
 
     @callback
     def _handle_coordinator_update(self) -> None:
