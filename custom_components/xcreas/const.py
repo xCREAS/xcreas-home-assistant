@@ -1,7 +1,7 @@
-"""Constants for the xCREAS Home Assistant integration (beta, manual install).
+"""Constants for the xCREAS Home Assistant integration.
 
 Contract authority: xcreas-api `docs/ha-integration.md` (§1 endpoints, §3
-authorization intersection, §4 snapshot, §5 command, §6 entity mapping, §7
+account device inventory, §4 snapshot, §5 command, §6 entity mapping, §7
 push channel). The API samples in `tests/fixtures/contract_samples.json`
 mirror that document.
 """
