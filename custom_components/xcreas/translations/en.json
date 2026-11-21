@@ -1,0 +1,51 @@
+{
+  "config": {
+    "step": {
+      "pick_implementation": {
+        "title": "Pick your xCREAS authorization",
+        "description": "Sign in to xCREAS in the browser window and choose the devices Home Assistant may control."
+      },
+      "auth": {
+        "title": "Connect to xCREAS",
+        "description": "The xCREAS authorization was not completed. Open the link again and select your devices."
+      }
+    },
+    "error": {
+      "invalid_token": "The xCREAS authorization expired. Start again.",
+      "insufficient_scope": "The authorization is missing the required scope. Start again.",
+      "device_not_authorized": "A selected device is no longer accessible from your account. Check the device in the xCREAS app.",
+      "device_not_found": "A selected device no longer exists.",
+      "device_offline": "A selected device is currently offline.",
+      "device_unavailable": "The device state could not be read from the xCREAS cloud.",
+      "device_not_active": "A selected device is not active.",
+      "state_unavailable": "The device state could not be read.",
+      "device_access_unavailable": "The device access check failed on the xCREAS cloud.",
+      "service_unavailable": "The xCREAS service is temporarily unavailable. Try again.",
+      "transport_error": "Could not reach the xCREAS cloud. Check your connection and try again.",
+      "unknown": "Unexpected error. Please check the logs and try again."
+    },
+    "abort": {
+      "already_configured": "This xCREAS account is already set up.",
+      "oauth_error": "The xCREAS authorization was cancelled or failed.",
+      "missing_configuration": "The integration is missing its OAuth configuration.",
+      "oauth_unauthorized": "The xCREAS authorization was refused.",
+      "oauth_failed": "The xCREAS authorization failed.",
+      "no_devices_authorized": "No devices were authorized for this connection. Reconnect and select at least one device on the xCREAS page.",
+      "device_already_linked": "One of the selected devices is already controlled by another xCREAS connection in this Home Assistant. Revoke that connection first (xCREAS app → Integrations → Home Assistant).",
+      "account_unresolved": "The xCREAS cloud did not identify the account."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "pm25": {
+        "name": "PM2.5"
+      },
+      "temperature": {
+        "name": "Temperature"
+      },
+      "humidity": {
+        "name": "Humidity"
+      }
+    }
+  }
+}

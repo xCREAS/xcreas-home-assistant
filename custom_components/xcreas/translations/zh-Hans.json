@@ -1,0 +1,51 @@
+{
+  "config": {
+    "step": {
+      "pick_implementation": {
+        "title": "选择 xCREAS 授权",
+        "description": "在浏览器中登录 xCREAS，并勾选允许 Home Assistant 查看和控制的设备。"
+      },
+      "auth": {
+        "title": "连接 xCREAS",
+        "description": "xCREAS 授权未完成。请重新打开链接并选择设备。"
+      }
+    },
+    "error": {
+      "invalid_token": "xCREAS 授权已失效。请重新开始。",
+      "insufficient_scope": "授权缺少所需权限。请重新开始。",
+      "device_not_authorized": "所选设备已无法从当前账号访问。请在 xCREAS App 中检查该设备。",
+      "device_not_found": "所选设备已不存在。",
+      "device_offline": "所选设备当前离线。",
+      "device_unavailable": "无法从 xCREAS 云端读取设备状态。",
+      "device_not_active": "所选设备未激活。",
+      "state_unavailable": "无法读取设备状态。",
+      "device_access_unavailable": "xCREAS 云端的设备访问检查失败。",
+      "service_unavailable": "xCREAS 服务暂时不可用。请稍后重试。",
+      "transport_error": "无法连接 xCREAS 云端。请检查网络后重试。",
+      "unknown": "未知错误。请查看日志后重试。"
+    },
+    "abort": {
+      "already_configured": "该 xCREAS 账号已配置。",
+      "oauth_error": "xCREAS 授权被取消或失败。",
+      "missing_configuration": "集成缺少 OAuth 配置。",
+      "oauth_unauthorized": "xCREAS 授权被拒绝。",
+      "oauth_failed": "xCREAS 授权失败。",
+      "no_devices_authorized": "该连接未授权任何设备。请重新连接，并在 xCREAS 页面上至少选择一台设备。",
+      "device_already_linked": "所选设备已由本 Home Assistant 中的另一个 xCREAS 连接控制。请先在 xCREAS App（集成 → Home Assistant）中解除该连接。",
+      "account_unresolved": "xCREAS 云端未能识别账号。"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "pm25": {
+        "name": "PM2.5"
+      },
+      "temperature": {
+        "name": "温度"
+      },
+      "humidity": {
+        "name": "湿度"
+      }
+    }
+  }
+}
