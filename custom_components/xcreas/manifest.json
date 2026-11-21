@@ -6,14 +6,14 @@
     "sensors.air_quality"
   ],
   "codeowners": [
-    "@xiezichao"
+    "@tonis-xie"
   ],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/xiezichao/xcreas-home-assistant",
+  "documentation": "https://github.com/xCREAS/xcreas-home-assistant",
   "integration_type": "hub",
   "iot_class": "cloud_push",
-  "issue_tracker": "https://github.com/xiezichao/xcreas-home-assistant/issues",
+  "issue_tracker": "https://github.com/xCREAS/xcreas-home-assistant/issues",
   "requirements": [],
-  "version": "0.1.4"
+  "version": "1.0.0"
 }
