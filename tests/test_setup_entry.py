@@ -4,6 +4,7 @@ releases the ws task (docs/ha-integration.md §7 + account-sync §4)."""
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import time
 from unittest.mock import AsyncMock, patch
@@ -178,6 +179,91 @@ async def test_failed_refresh_keeps_entities(
         await hass.async_block_till_done()
     assert len(_entity_ids(hass, Platform.FAN)) == 1
     assert len(_entity_ids(hass, Platform.SENSOR)) == 3
+
+
+async def test_rebind_unnamed_device_regains_name_without_reload(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The field-reported rebind scenario: an app-side delete purges the
+    device NAME with the binding, so the re-bound device re-registers with
+    name=null ("Unnamed device"); a later app rename must flow into the
+    device registry without a reload (and the entity identity survives)."""
+    from homeassistant.helpers import device_registry as dr
+
+    # Shrink the registry-cleanup delay so the removal completes within the
+    # test's event loop.
+    monkeypatch.setattr("custom_components.xcreas.entity._CLEANUP_DELAY_SECONDS", 0)
+
+    entry = setup_entry
+    coordinator = entry.runtime_data
+    registry = dr.async_get(hass)
+
+
+    def dev_entry():
+        # async_entries_for_config_entry exists on every verified HA version
+        # (async_get_device_by_identifier landed only in 2026.x).
+        for reg_entry in dr.async_entries_for_config_entry(registry, entry.entry_id):
+            if (DOMAIN, "V350s-001") in reg_entry.identifiers:
+                return reg_entry
+        return None
+
+    assert dev_entry().name == "客厅净化器"
+
+    # 1. The user deletes the device in the app → it leaves the inventory
+    #    and HA removes its registry row entirely.
+    async def _empty():
+        body = copy.deepcopy(CONTRACT["snapshot_empty"])
+        return body
+
+    with patch.object(coordinator.client, "async_get_snapshot", _empty):
+        coordinator.async_connection_changed()
+        await coordinator._push_refresh_task
+        await hass.async_block_till_done()
+        await asyncio.sleep(0.05)  # the zero-delay cleanup task
+        await hass.async_block_till_done()
+    assert dev_entry() is None
+    assert _entity_ids(hass, Platform.FAN) == []
+
+    # 2. The user re-binds it: the cloud has NO name (purged) → the device
+    #    re-registers unnamed.
+    async def _unnamed():
+        body = copy.deepcopy(CONTRACT["snapshot"])
+        body["devices"][0]["name"] = None
+        return body
+
+    with patch.object(coordinator.client, "async_get_snapshot", _unnamed):
+        coordinator.async_connection_changed()
+        await coordinator._push_refresh_task
+        await hass.async_block_till_done()
+    assert len(_entity_ids(hass, Platform.FAN)) == 1
+    assert dev_entry() is not None
+    assert dev_entry().name is None  # the "Unnamed device" state
+
+    # 3. The user names it in the app → the next inventory syncs the name
+    #    into the registry WITHOUT a reload.
+    async def _renamed():
+        body = copy.deepcopy(CONTRACT["snapshot"])
+        body["devices"][0]["name"] = "卧室净化器"
+        return body
+
+    with patch.object(coordinator.client, "async_get_snapshot", _renamed):
+        coordinator.async_connection_changed()
+        await coordinator._push_refresh_task
+        await hass.async_block_till_done()
+    assert dev_entry().name == "卧室净化器"
+
+    # The ENTITY IDENTITY (unique_id) is stable across the whole cycle —
+    # the entity_id string may regenerate when the friendly name changes,
+    # but the registry row keyed by <device_id>:<kind> never moves.
+    from homeassistant.helpers import entity_registry as er
+
+    entity_registry = er.async_get(hass)
+    uids = sorted(
+        e.unique_id
+        for e in entity_registry.entities.values()
+        if e.config_entry_id is not None and e.domain == Platform.FAN.value
+    )
+    assert uids == ["V350s-001:fan"]
 
 
 async def test_push_refresh_uses_real_api(

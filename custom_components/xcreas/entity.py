@@ -101,7 +101,8 @@ def make_device_reconciler(
     select only registers devices advertising supports_fan_level).
     """
 
-    from homeassistant.helpers import entity_registry
+    from homeassistant.helpers import device_registry as dr
+    from homeassistant.helpers import entity_registry as er
 
     @callback
     def _reconcile(snapshot=None) -> None:
@@ -109,7 +110,8 @@ def make_device_reconciler(
         # fires its device listeners inside _async_update_data, BEFORE
         # self.data is swapped — reading coordinator.data there would
         # reconcile against the PREVIOUS inventory and lose the change.
-        er = entity_registry.async_get(hass)
+        er_reg = er.async_get(hass)
+        dreg = dr.async_get(hass)
         if snapshot is not None:
             present = snapshot.devices
         else:
@@ -130,7 +132,7 @@ def make_device_reconciler(
                 # unavailable — the registry row must be removed explicitly
                 # or the entity survives the next reload.
                 if entity.entity_id:
-                    er.async_remove(entity.entity_id)
+                    er_reg.async_remove(entity.entity_id)
                 # Entity.async_remove is a coroutine and this reconcile runs
                 # in a @callback (sync context) — schedule it instead of
                 # calling it bare (the live "coroutine never awaited"
@@ -148,7 +150,7 @@ def make_device_reconciler(
                 uid = entity.unique_id
                 if uid in owned:
                     continue
-                reg = er.async_get(uid)
+                reg = er_reg.async_get(uid)
                 if reg is not None and reg.config_entry_id not in (None, entry.entry_id):
                     continue
                 owned[uid] = entity
@@ -156,10 +158,51 @@ def make_device_reconciler(
         if to_add:
             async_add_entities(to_add, update_before_add=True)
 
+        # Sync the device-registry display name (and model) with the CURRENT
+        # snapshot: a device re-bound after an app-side delete registers with
+        # name=null (the app purged the name with the binding) → HA shows
+        # "Unnamed device", and a later app rename must flow into HA without
+        # a reload. name_by_user (a user rename INSIDE Home Assistant) is a
+        # separate field and stays authoritative. Note the freshly-added
+        # entities above constructed their DeviceInfo from coordinator.data
+        # (the PREVIOUS inventory — the listener fires before the swap), so
+        # this sync is what actually lands the new snapshot's name.
+        if present:
+            for registry_entry in dr.async_entries_for_config_entry(dreg, entry.entry_id):
+                for domain, value in registry_entry.identifiers:
+                    if domain != DOMAIN:
+                        continue
+                    device = present.get(value)
+                    if device is None:
+                        continue
+                    changes = {}
+                    if registry_entry.name != device.name:
+                        changes["name"] = device.name
+                    if registry_entry.model != device.model:
+                        changes["model"] = device.model
+                    if changes:
+                        dreg.async_update_device(registry_entry.id, **changes)
+                    break
+
         if removed_devices:
             _schedule_registry_cleanup(coordinator, hass, entry, removed_devices)
 
     return _reconcile
+
+
+# The device-registry cleanup delay: the entity removals run as explicit
+# tasks, so one second is ample; injectable for tests.
+_CLEANUP_DELAY_SECONDS = 1.0
+
+
+def device_owned_by_entry(registry_entry, entry_id: str) -> bool:
+    """Whether a device-registry row belongs to the config entry — across
+    HA versions: DeviceEntry.config_entry_id (singular, HA ≥ 2026.x) with
+    the legacy config_entries set as the fallback for 2025.x."""
+    single = getattr(registry_entry, "config_entry_id", None)
+    if single is not None:
+        return single == entry_id
+    return entry_id in getattr(registry_entry, "config_entries", ())
 
 
 def _schedule_registry_cleanup(coordinator, hass, entry, device_ids: set) -> None:
@@ -171,7 +214,7 @@ def _schedule_registry_cleanup(coordinator, hass, entry, device_ids: set) -> Non
     async def _cleanup() -> None:
         import asyncio
 
-        await asyncio.sleep(10)  # let async_remove() complete its writes
+        await asyncio.sleep(_CLEANUP_DELAY_SECONDS)
         registry = dr.async_get(hass)
         data = coordinator.data
         present = set(data.devices) if data else set()
@@ -181,7 +224,7 @@ def _schedule_registry_cleanup(coordinator, hass, entry, device_ids: set) -> Non
             for domain, value in registry_entry.identifiers:
                 if domain != DOMAIN or value not in device_ids:
                     continue
-                if registry_entry.config_entry_id != entry.entry_id:
+                if not device_owned_by_entry(registry_entry, entry.entry_id):
                     continue
                 if value in present:
                     continue  # re-added meanwhile — keep the identity

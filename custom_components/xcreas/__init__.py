@@ -22,6 +22,7 @@ from homeassistant.helpers import config_validation as cv
 from .api import XcreasApiClient
 from .const import CONF_ACCOUNT_ID, CONF_BASE_URL, DEFAULT_BASE_URL, DOMAIN, WS_PATH
 from .coordinator import XcreasCoordinator
+from .entity import device_owned_by_entry
 from .websocket import XcreasWebsocket
 
 _LOGGER = logging.getLogger(__name__)
@@ -99,7 +100,7 @@ async def _cleanup_stale_registry(hass: HomeAssistant, entry: ConfigEntry, coord
         for domain, value in registry_entry.identifiers:
             if domain != DOMAIN or value in valid:
                 continue
-            if registry_entry.config_entry_id != entry.entry_id:
+            if not device_owned_by_entry(registry_entry, entry.entry_id):
                 continue
             registry.async_remove_device(registry_entry.id)
             _LOGGER.info("xcreas: removed stale device registry entry %s", value)
