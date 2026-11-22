@@ -131,7 +131,11 @@ def make_device_reconciler(
                 # or the entity survives the next reload.
                 if entity.entity_id:
                     er.async_remove(entity.entity_id)
-                entity.async_remove()
+                # Entity.async_remove is a coroutine and this reconcile runs
+                # in a @callback (sync context) — schedule it instead of
+                # calling it bare (the live "coroutine never awaited"
+                # RuntimeWarning left removal incomplete).
+                hass.async_create_task(entity.async_remove())
 
         # Add devices present but not ours (cross-entry dedup via the
         # entity registry).
@@ -171,11 +175,13 @@ def _schedule_registry_cleanup(coordinator, hass, entry, device_ids: set) -> Non
         registry = dr.async_get(hass)
         data = coordinator.data
         present = set(data.devices) if data else set()
-        for registry_entry in list(registry.devices.values()):
+        # async_entries_for_config_entry — NOT the deprecated
+        # registry.devices mapping access (HA 2027.9 removal).
+        for registry_entry in dr.async_entries_for_config_entry(registry, entry.entry_id):
             for domain, value in registry_entry.identifiers:
                 if domain != DOMAIN or value not in device_ids:
                     continue
-                if entry.entry_id not in registry_entry.config_entries:
+                if registry_entry.config_entry_id != entry.entry_id:
                     continue
                 if value in present:
                     continue  # re-added meanwhile — keep the identity

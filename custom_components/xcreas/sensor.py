@@ -30,6 +30,11 @@ from homeassistant.core import callback
 
 from .entity import XcreasEntity, make_device_reconciler
 
+try:  # UnitOfDensity landed after HA 2025.4 (the verified floor)
+    from homeassistant.const import UnitOfDensity
+except ImportError:  # pragma: no cover - old-HA path
+    UnitOfDensity = None
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -83,7 +88,11 @@ class XcreasSensor(XcreasEntity, SensorEntity):
 
 class XcreasPM25Sensor(XcreasSensor):
     _attr_device_class = SensorDeviceClass.PM25
-    _attr_native_unit_of_measurement = CONCENTRATION_MICROGRAMS_PER_CUBIC_METER
+    _attr_native_unit_of_measurement = (
+        UnitOfDensity.MICROGRAMS_PER_CUBIC_METER
+        if UnitOfDensity is not None
+        else CONCENTRATION_MICROGRAMS_PER_CUBIC_METER
+    )
 
     def __init__(self, coordinator, device_id: str) -> None:
         super().__init__(coordinator, device_id, "pm25")

@@ -93,11 +93,13 @@ async def _cleanup_stale_registry(hass: HomeAssistant, entry: ConfigEntry, coord
     await asyncio.sleep(10)  # let the platform reconciles finish removing entities
     registry = dr.async_get(hass)
     valid = set(coordinator.data.devices) if coordinator.data else set()
-    for registry_entry in list(registry.devices.values()):
+    # async_entries_for_config_entry — NOT the deprecated registry.devices
+    # mapping access (HA 2027.9 removal).
+    for registry_entry in dr.async_entries_for_config_entry(registry, entry.entry_id):
         for domain, value in registry_entry.identifiers:
             if domain != DOMAIN or value in valid:
                 continue
-            if entry.entry_id not in registry_entry.config_entries:
+            if registry_entry.config_entry_id != entry.entry_id:
                 continue
             registry.async_remove_device(registry_entry.id)
             _LOGGER.info("xcreas: removed stale device registry entry %s", value)
